@@ -439,6 +439,11 @@ function fetchEsvHtml(ref) {
 }
 
 function fetchEsvPlainText(ref) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'esvtext:' + ref;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
   const key = requiredProp('ESV_API_KEY');
   const url = 'https://api.esv.org/v3/passage/text/?q=' + encodeURIComponent(ref) +
               '&include-headings=false&include-footnotes=false&include-verse-numbers=true' +
@@ -449,7 +454,9 @@ function fetchEsvPlainText(ref) {
   });
   if (res.getResponseCode() !== 200) throw new Error('ESV API ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 200));
   const data = JSON.parse(res.getContentText());
-  return (data.passages || []).join('\n');
+  const text = (data.passages || []).join('\n');
+  if (text && text.length < 95000) cache.put(cacheKey, text, 21600);
+  return text;
 }
 
 function fetchNltHtml(ref) {
@@ -508,8 +515,8 @@ function handleChat(body) {
     "- Stay orthodox and Scripture-grounded.";
 
   const response = callClaudeWithFallback({
-    model: SONNET_MODEL,
-    max_tokens: 1500,
+    model: HAIKU_MODEL,
+    max_tokens: 800,
     system: system,
     messages: messages,
   });
