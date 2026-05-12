@@ -198,6 +198,7 @@ function generateAnswers(reading, passageText) {
     "- Be thoughtful but concise. 2-4 sentences per answer. Avoid filler.\n" +
     "- Stay conservative and orthodox. Do not speculate beyond what the text supports.\n" +
     "- Stay focused on THIS passage. Do not drift into adjacent themes.\n" +
+    "- For questions 4 and 5, write in the first person plural (we, us, our) — never first person singular (I, me, my).\n" +
     "- When citing other Scripture for support, use sparingly (0-2 citations per answer max) and only when genuinely illuminating.\n" +
     "- Cite cross-references inline using this exact format: [[Book C:V]] or [[Book C:V-V]] (e.g. [[John 3:16]], [[Romans 8:28-30]]). The frontend will turn these into Bible Gateway links.\n" +
     "- Do NOT cite the reading itself as a cross-reference (no [[" + reading + "]] tags).\n" +
