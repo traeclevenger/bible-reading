@@ -277,6 +277,7 @@ function handleApprove(p) {
   draft.status = 'approved';
   draft.approvedAt = new Date().toISOString();
   saveDraft(date, draft);
+  CacheService.getScriptCache().remove('reflections-block:' + date);
   return '<h2 style="font-family:Georgia,serif;color:#111;">Approved.</h2>' +
          '<p style="font-family:Helvetica,Arial,sans-serif;color:#666;">' +
            escapeHtml(date) + ' — ' + escapeHtml(draft.reading) + ' is now live on the site.</p>';
@@ -313,6 +314,7 @@ function handleAdminSave(body) {
   draft.status = 'approved';
   draft.approvedAt = new Date().toISOString();
   saveDraft(body.date, draft);
+  CacheService.getScriptCache().remove('reflections-block:' + body.date);
   return { ok: true };
 }
 
@@ -477,21 +479,14 @@ function handleChat(body) {
   const messages = body.messages || [];
   const reading = body.reading || '';
   const sessionId = body.sessionId || 'unknown';
-  const reflections = body.reflections || null;
   let passageText = '';
   try {
     if (reading) passageText = fetchEsvPlainText(reading);
   } catch (_) { /* non-fatal */ }
 
-  let reflectionsBlock = '';
-  if (reflections && Array.isArray(reflections.questions) && Array.isArray(reflections.answers)) {
-    reflectionsBlock = "\nApproved reflections shown on the site today (the user can see these):\n";
-    for (let i = 0; i < reflections.questions.length; i++) {
-      reflectionsBlock += 'Q' + (i + 1) + ': ' + reflections.questions[i] + '\n';
-      reflectionsBlock += 'A' + (i + 1) + ': ' + (reflections.answers[i] || '') + '\n\n';
-    }
-    reflectionsBlock += 'You may be asked to expand on, defend, or clarify any of these. Stay consistent with them unless the user explicitly asks for a different angle.\n';
-  }
+  const reflectionsBlock = loadReflectionsBlock(reading);
+  const wantsDetail = wantsMoreDetail(messages);
+  const chosenModel = wantsDetail ? SONNET_MODEL : HAIKU_MODEL;
 
   const system =
     "You are a knowledgeable, conservative Bible study assistant for the daily reading plan at " +
@@ -515,8 +510,8 @@ function handleChat(body) {
     "- Stay orthodox and Scripture-grounded.";
 
   const response = callClaudeWithFallback({
-    model: HAIKU_MODEL,
-    max_tokens: 800,
+    model: chosenModel,
+    max_tokens: wantsDetail ? 1800 : 800,
     system: system,
     messages: messages,
   });
@@ -531,6 +526,59 @@ function handleChat(body) {
   } catch (_) { /* never let logging break the response */ }
 
   return { answer: answer };
+}
+
+function loadReflectionsBlock(reading) {
+  const cache = CacheService.getScriptCache();
+  const dateKey = formatDate(new Date());
+  const cacheKey = 'reflections-block:' + dateKey;
+  const cached = cache.get(cacheKey);
+  if (cached !== null && cached !== undefined) return cached;
+
+  const draft = loadDraft(dateKey);
+  let block = '';
+  if (draft && draft.status === 'approved' &&
+      Array.isArray(draft.questions) && Array.isArray(draft.answers) &&
+      (!reading || draft.reading === reading)) {
+    block = "\nApproved reflections shown on the site today (the user can see these):\n";
+    for (let i = 0; i < draft.questions.length; i++) {
+      block += 'Q' + (i + 1) + ': ' + draft.questions[i] + '\n';
+      block += 'A' + (i + 1) + ': ' + (draft.answers[i] || '') + '\n\n';
+    }
+    block += 'You may be asked to expand on, defend, or clarify any of these. Stay consistent with them unless the user explicitly asks for a different angle.\n';
+  }
+  // Cache the assembled block (including empty string) for an hour.
+  cache.put(cacheKey, block, 3600);
+  return block;
+}
+
+/**
+ * Returns true if the user's latest message is asking the assistant to expand
+ * on a prior answer. Triggers on explicit phrases ("tell me more", "go deeper")
+ * or a short affirmative ("yes", "sure") when the previous assistant turn
+ * ended with a question (an offer to expand).
+ */
+function wantsMoreDetail(messages) {
+  if (!messages || !messages.length) return false;
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== 'user' || typeof last.content !== 'string') return false;
+  const text = last.content.trim().toLowerCase();
+  if (!text) return false;
+
+  const expandPattern = /\b(more|elaborate|expand|deeper|unpack|details?|explain (further|more)|tell me more|go on|continue|keep going|dig in|dive in)\b/;
+  if (expandPattern.test(text)) return true;
+
+  // Short affirmative follow-up after an offer-to-expand from the assistant.
+  if (text.length <= 30 && /\b(yes|yep|yeah|sure|please|ok|okay|definitely|absolutely|do it|go for it)\b/.test(text)) {
+    for (let i = messages.length - 2; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role === 'assistant' && typeof m.content === 'string') {
+        if (/\?\s*$/.test(m.content.trim())) return true;
+        break;
+      }
+    }
+  }
+  return false;
 }
 
 // ── Chat analytics ────────────────────────────────────────────────────────────

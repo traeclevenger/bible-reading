@@ -500,9 +500,6 @@
           messages: chatHistory,
           reading: state.reading,
           sessionId: SESSION_ID,
-          reflections: (state.status === 'approved' && state.answers)
-            ? { questions: state.questions, answers: state.answers }
-            : null,
         }),
       });
       if (!res.ok) throw new Error('Request failed: ' + res.status);
