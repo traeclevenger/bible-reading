@@ -32,13 +32,13 @@
   .watermark {
     position: fixed; pointer-events: none; z-index: 0;
     right: 0; top: var(--header-h); width: 50vw; height: calc(100vh - var(--header-h));
-    background: url('heart-hands.png') center center / 60% no-repeat;
-    opacity: 0.10;
+    background: url('watermark.png') center center / 30% no-repeat;
+    opacity: 0.25;
   }
   @media (max-width: 900px) {
     .watermark {
       right: 0; left: 0; width: 100vw;
-      background-size: 70% auto;
+      background-size: 35% auto;
       background-position: center 30%;
     }
   }
@@ -47,15 +47,26 @@
     background: #fff; border-bottom: 1px solid var(--border);
     padding: 12px 24px; height: var(--header-h); flex-shrink: 0;
     box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    display: flex; align-items: center; gap: 14px;
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center;
     position: relative; z-index: 2;
   }
   .site-logo { height: 44px; width: auto; display: block; }
   .header-title {
-    font-family: Georgia, serif; font-size: 1.15rem; color: var(--accent3);
-    line-height: 1; display: flex; flex-direction: column; gap: 3px;
+    font-family: Georgia, serif; color: var(--accent3);
+    text-align: center; line-height: 1.1;
   }
-  .header-title small { font-size: 0.7rem; color: var(--subtext); letter-spacing: 0.06em; text-transform: uppercase; }
+  .header-title .main {
+    font-size: 1.6rem; font-weight: 600; letter-spacing: 0.01em;
+  }
+  .header-title small {
+    display: block; margin-top: 4px;
+    font-size: 0.72rem; color: var(--subtext); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .header-spacer { width: 44px; }
+  @media (max-width: 600px) {
+    .header-title .main { font-size: 1.15rem; }
+    .header-title small { font-size: 0.66rem; }
+  }
 
   .layout {
     flex: 1; display: grid;
@@ -213,9 +224,10 @@
 <header>
   <img src="WS logo.png" alt="Westside" class="site-logo">
   <div class="header-title">
-    Like the Teacher
-    <small id="dateLabel">Daily Bible Reading · 2026</small>
+    <div class="main">Daily Bible Reading</div>
+    <small id="dateLabel">2026</small>
   </div>
+  <div class="header-spacer"></div>
 </header>
 
 <div class="layout">
