@@ -220,6 +220,7 @@
     html, body { height: auto; min-height: 100dvh; }
     body { display: block; }
     .watermark { display: none; }  /* desktop watermark hidden; chat col gets its own bg */
+    .header-title { display: none; }  /* hide title text on mobile to declutter */
 
     .layout {
       display: block; overflow: visible; height: auto; min-height: 0;
@@ -246,7 +247,7 @@
       overflow-y: auto;
       background:
         linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)),
-        url('watermark.png') center center / 70% no-repeat;
+        url('watermark.png') center 85% / 65% no-repeat;
     }
     .chat-col .chat-input-wrap { padding-bottom: 28px; }
   }
