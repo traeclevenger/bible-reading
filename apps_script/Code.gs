@@ -18,6 +18,7 @@
  */
 
 const SONNET_MODEL = 'claude-sonnet-4-6';
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const ANTHROPIC_VERSION = '2023-06-01';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
@@ -212,7 +213,7 @@ function generateAnswers(reading, passageText) {
     questions.map(function (q, i) { return (i + 1) + '. ' + q; }).join('\n') + '\n\n' +
     'Write the answers now.';
 
-  const response = callClaude({
+  const response = callClaudeWithFallback({
     model: SONNET_MODEL,
     max_tokens: 2000,
     system: system,
@@ -485,7 +486,7 @@ function handleChat(body) {
     "- Plain text. No markdown headers. Short paragraphs.\n" +
     "- If the user asks something off-topic, gently redirect to today's reading.";
 
-  const response = callClaude({
+  const response = callClaudeWithFallback({
     model: SONNET_MODEL,
     max_tokens: 1500,
     system: system,
@@ -661,6 +662,24 @@ function callClaude(payload) {
     Utilities.sleep(Math.min(8000, 500 * Math.pow(2, attempt)));
   }
   throw new Error('Claude API ' + lastCode + ': ' + lastBody);
+}
+
+/**
+ * Calls Claude with the payload's model; if all retries fail (typically due to
+ * Sonnet being overloaded), retries once with Haiku as a fallback.
+ */
+function callClaudeWithFallback(payload) {
+  try {
+    return callClaude(payload);
+  } catch (err) {
+    if (payload.model === HAIKU_MODEL) throw err;
+    const msg = String(err && err.message || err);
+    // Only fall back on overload / rate-limit / transient errors.
+    if (!/Claude API (429|502|503|529)/.test(msg)) throw err;
+    Logger.log('Sonnet failed (' + msg.slice(0, 120) + '); falling back to Haiku.');
+    const fallback = Object.assign({}, payload, { model: HAIKU_MODEL });
+    return callClaude(fallback);
+  }
 }
 
 function extractText(response) {
