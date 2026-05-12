@@ -15,18 +15,48 @@
   body {
     background: var(--bg); color: var(--text);
     font-family: 'Segoe UI', system-ui, sans-serif;
+    margin: 0; padding: 0;
+    position: relative; min-height: 100vh;
+  }
+  .page {
     max-width: 780px; margin: 0 auto; padding: 28px 24px 60px;
-    position: relative;
+    position: relative; z-index: 1;
   }
   .watermark {
-    position: fixed; inset: 0; pointer-events: none; z-index: -1;
-    background: url('heart-hands.png') center 45% / 480px no-repeat;
-    opacity: 0.06;
+    position: fixed; pointer-events: none; z-index: 0;
+    right: 0; top: 68px; width: 50vw; height: calc(100vh - 68px);
+    background: url('watermark.png') center center / 30% no-repeat;
+    opacity: 0.25;
   }
-  header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
-  .site-logo { height: 44px; }
-  .htitle { font-family: Georgia, serif; font-size: 1.2rem; color: var(--accent3); }
-  .htitle small { display: block; font-size: 0.72rem; color: var(--subtext); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+  @media (max-width: 900px) {
+    .watermark {
+      right: 0; left: 0; width: 100vw;
+      background-size: 35% auto;
+      background-position: center 30%;
+    }
+  }
+  header {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 12px 24px; height: 68px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+    position: relative; z-index: 2;
+  }
+  .site-logo { height: 44px; width: auto; display: block; }
+  .htitle {
+    font-family: Georgia, serif; color: var(--accent3);
+    text-align: center; line-height: 1.1;
+  }
+  .htitle .main { font-size: 1.6rem; font-weight: 600; letter-spacing: 0.01em; }
+  .htitle small {
+    display: block; margin-top: 4px;
+    font-size: 0.72rem; color: var(--subtext); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .header-spacer { width: 44px; }
+  @media (max-width: 600px) {
+    .htitle .main { font-size: 1.15rem; }
+    .htitle small { font-size: 0.66rem; }
+  }
   h1 { font-family: Georgia, serif; color: var(--accent3); font-size: 1.4rem; margin-bottom: 4px; }
   .meta { font-size: 0.85rem; color: var(--subtext); margin-bottom: 24px; }
   .qa { margin-bottom: 22px; }
@@ -64,19 +94,25 @@
 <div class="watermark"></div>
 <header>
   <img src="WS logo.png" alt="Westside" class="site-logo">
-  <div class="htitle">Like the Teacher<small>Admin · Rewrite</small></div>
+  <div class="htitle">
+    <div class="main">Daily Bible Reading</div>
+    <small>Admin · Rewrite</small>
+  </div>
+  <div class="header-spacer"></div>
 </header>
 
-<h1 id="reading">Loading…</h1>
-<div class="meta" id="meta"></div>
+<div class="page">
+  <h1 id="reading">Loading…</h1>
+  <div class="meta" id="meta"></div>
 
-<form id="form" style="display:none;">
-  <div id="qaList"></div>
-  <div class="actions">
-    <button type="submit" class="btn-primary" id="saveBtn">Save & Approve</button>
-    <span class="status" id="status"></span>
-  </div>
-</form>
+  <form id="form" style="display:none;">
+    <div id="qaList"></div>
+    <div class="actions">
+      <button type="submit" class="btn-primary" id="saveBtn">Save & Approve</button>
+      <span class="status" id="status"></span>
+    </div>
+  </form>
+</div>
 
 <script>
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwr9_wwNh7eCcF-kGIeAoUPiGEC0wx3tzlRTB0BwmfNlucdjQsEWimTvnQtvnpVeE9d/exec';
