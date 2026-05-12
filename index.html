@@ -217,17 +217,38 @@
 
   /* ── Mobile ── */
   @media (max-width: 900px) {
-    .layout { display: flex; flex-direction: column; overflow-y: auto; }
-    .col { border-right: none; border-bottom: 1px solid var(--border); }
-    .col.collapsed .col-body { display: none; }
-    .col-header { cursor: pointer; user-select: none; }
+    html, body { height: auto; min-height: 100dvh; }
+    body { display: block; }
+    .watermark { display: none; }  /* desktop watermark hidden; chat col gets its own bg */
+
+    .layout {
+      display: block; overflow: visible; height: auto; min-height: 0;
+    }
+    .col {
+      border-right: none; border-bottom: 1px solid var(--border);
+      display: block; overflow: visible;
+    }
+    .col-header { cursor: pointer; user-select: none; position: relative; padding-right: 36px; }
     .col-header::after {
-      content: '▾'; float: right; color: var(--subtext); font-size: 0.85rem;
+      content: '▾'; position: absolute; right: 16px; top: 50%;
+      transform: translateY(-50%); color: rgba(255,255,255,0.85); font-size: 0.9rem;
       transition: transform 0.2s;
     }
-    .col.collapsed .col-header::after { transform: rotate(-90deg); }
-    .col-body { max-height: 60vh; }
-    .chat-col .col-body, .chat-col .chat-messages { max-height: 50vh; }
+    .col.collapsed .col-header::after { transform: translateY(-50%) rotate(-90deg); }
+    .col.collapsed .col-body,
+    .col.collapsed .chat-messages,
+    .col.collapsed .chat-input-wrap { display: none; }
+    .col-body { max-height: none; overflow: visible; }
+
+    /* Chat section: watermark as its own background; fixed messages height */
+    .chat-col .chat-messages {
+      flex: none; height: auto; min-height: 50vh; max-height: 60vh;
+      overflow-y: auto;
+      background:
+        linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)),
+        url('watermark.png') center center / 70% no-repeat;
+    }
+    .chat-col .chat-input-wrap { padding-bottom: 28px; }
   }
 </style>
 </head>
@@ -529,8 +550,14 @@
     recognition.onend = () => { listening = false; micBtn.classList.remove('listening'); };
   }
 
+  // Default-collapse the top two sections on mobile so the chat is visible.
+  if (window.innerWidth <= 900) {
+    document.getElementById('col-reading').classList.add('collapsed');
+    document.getElementById('col-answers').classList.add('collapsed');
+  }
+
   loadToday();
-  document.getElementById('askInput').focus();
+  document.getElementById('askInput').focus({ preventScroll: false });
 </script>
 </body>
 </html>
