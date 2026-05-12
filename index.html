@@ -323,6 +323,13 @@
   // Paste your Apps Script web app /exec URL here after deploying.
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwr9_wwNh7eCcF-kGIeAoUPiGEC0wx3tzlRTB0BwmfNlucdjQsEWimTvnQtvnpVeE9d/exec';
 
+  // Persistent session ID to approximate unique users in analytics.
+  const SESSION_ID = (() => {
+    let id = localStorage.getItem('bible_session_id');
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem('bible_session_id', id); }
+    return id;
+  })();
+
   let state = {
     reading: null,
     contentDate: null,
@@ -488,7 +495,7 @@
       const res = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'chat', messages: chatHistory, reading: state.reading }),
+        body: JSON.stringify({ action: 'chat', messages: chatHistory, reading: state.reading, sessionId: SESSION_ID }),
       });
       if (!res.ok) throw new Error('Request failed: ' + res.status);
       const data = await res.json();

@@ -468,6 +468,7 @@ function fetchNltHtml(ref) {
 function handleChat(body) {
   const messages = body.messages || [];
   const reading = body.reading || '';
+  const sessionId = body.sessionId || 'unknown';
   let passageText = '';
   try {
     if (reading) passageText = fetchEsvPlainText(reading);
@@ -490,7 +491,127 @@ function handleChat(body) {
     system: system,
     messages: messages,
   });
-  return { answer: extractText(response).trim() };
+  const answer = extractText(response).trim();
+
+  // Log the last user turn + this answer to the analytics sheet.
+  try {
+    const lastUser = [...messages].reverse().find(function (m) { return m.role === 'user'; });
+    const question = lastUser && typeof lastUser.content === 'string' ? lastUser.content : '';
+    logUsage(sessionId, reading, question, answer);
+  } catch (_) { /* never let logging break the response */ }
+
+  return { answer: answer };
+}
+
+// ── Chat analytics ────────────────────────────────────────────────────────────
+
+function logUsage(sessionId, reading, question, answer) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    let sheetId = props.getProperty('ANALYTICS_SHEET_ID');
+    const ownerIds = (props.getProperty('OWNER_SESSION_IDS') || '')
+      .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    const isOwner = ownerIds.indexOf(sessionId) >= 0;
+
+    let ss;
+    if (!sheetId) {
+      ss = SpreadsheetApp.create('Bible Reading Usage');
+      const sheet = ss.getActiveSheet();
+      sheet.setName('Usage');
+      sheet.appendRow(['Timestamp', 'Session ID', 'Owner', 'Reading', 'Question', 'Response']);
+      sheet.setFrozenRows(1);
+      props.setProperty('ANALYTICS_SHEET_ID', ss.getId());
+    } else {
+      ss = SpreadsheetApp.openById(sheetId);
+    }
+    ss.getSheetByName('Usage').appendRow([
+      new Date().toISOString(),
+      sessionId,
+      isOwner ? 'yes' : '',
+      reading || '',
+      (question || '').slice(0, 500),
+      (answer || '').slice(0, 1500),
+    ]);
+  } catch (_) { /* swallow */ }
+}
+
+function setupDailyDigestTrigger() {
+  ScriptApp.getProjectTriggers()
+    .filter(function (t) { return t.getHandlerFunction() === 'sendDailyDigest'; })
+    .forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('sendDailyDigest')
+    .timeBased()
+    .atHour(7)
+    .everyDays(1)
+    .inTimezone(Session.getScriptTimeZone())
+    .create();
+  Logger.log('Daily chat digest trigger installed (7am daily).');
+}
+
+function sendDailyDigest() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const sheetId = props.getProperty('ANALYTICS_SHEET_ID');
+    if (!sheetId) return;
+
+    const ownerEmail = props.getProperty('RECIPIENT_EMAIL') || Session.getEffectiveUser().getEmail();
+
+    const ss = SpreadsheetApp.openById(sheetId);
+    const sheet = ss.getSheetByName('Usage');
+    const data = sheet.getDataRange().getValues();
+
+    // Headers: Timestamp, Session ID, Owner, Reading, Question, Response
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const rows = data.slice(1).filter(function (row) {
+      const ts = new Date(row[0]);
+      const isOwner = row[2] === 'yes';
+      return ts >= cutoff && !isOwner;
+    });
+    if (!rows.length) return;
+
+    const sessions = {};
+    const sessionOrder = [];
+    rows.forEach(function (row) {
+      const sid = row[1];
+      if (!sessions[sid]) { sessions[sid] = []; sessionOrder.push(sid); }
+      sessions[sid].push({
+        timestamp: new Date(row[0]),
+        reading: row[3] || '',
+        question: row[4] || '',
+        response: row[5] || '',
+      });
+    });
+
+    const dateStr = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    let bodyText =
+      'Daily Bible Reading — Chat Usage Digest\n' +
+      dateStr + '\n' +
+      'Sessions: ' + sessionOrder.length + '  |  Questions: ' + rows.length + '\n' +
+      '='.repeat(60) + '\n\n';
+
+    sessionOrder.forEach(function (sid, i) {
+      const turns = sessions[sid];
+      const start = turns[0].timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      bodyText += 'SESSION ' + (i + 1) + '  (' + turns.length + ' question' +
+                  (turns.length !== 1 ? 's' : '') + '  •  started ' + start +
+                  '  •  reading: ' + (turns[0].reading || 'n/a') + ')\n';
+      bodyText += '-'.repeat(60) + '\n';
+      turns.forEach(function (turn, j) {
+        bodyText += 'Q' + (j + 1) + ': ' + turn.question + '\n\n';
+        bodyText += 'A: ' + turn.response + '\n\n';
+      });
+      bodyText += '\n';
+    });
+
+    MailApp.sendEmail({
+      to: ownerEmail,
+      subject: 'Bible Reading Chat Usage — ' + dateStr,
+      body: bodyText.trim(),
+    });
+  } catch (_) { /* silent */ }
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
