@@ -641,17 +641,26 @@ function pruneOldDrafts() {
 
 function callClaude(payload) {
   const apiKey = requiredProp('ANTHROPIC_API_KEY');
-  const res = UrlFetchApp.fetch(ANTHROPIC_API_URL, {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { 'x-api-key': apiKey, 'anthropic-version': ANTHROPIC_VERSION },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
-  });
-  const code = res.getResponseCode();
-  const body = res.getContentText();
-  if (code !== 200) throw new Error('Claude API ' + code + ': ' + body);
-  return JSON.parse(body);
+  const maxAttempts = 4;
+  let lastCode = 0, lastBody = '';
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = UrlFetchApp.fetch(ANTHROPIC_API_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': ANTHROPIC_VERSION },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    const code = res.getResponseCode();
+    const body = res.getContentText();
+    if (code === 200) return JSON.parse(body);
+    lastCode = code; lastBody = body;
+    // Retry on overload / rate-limit / transient server errors.
+    const retriable = code === 429 || code === 502 || code === 503 || code === 529;
+    if (!retriable || attempt === maxAttempts) break;
+    Utilities.sleep(Math.min(8000, 500 * Math.pow(2, attempt)));
+  }
+  throw new Error('Claude API ' + lastCode + ': ' + lastBody);
 }
 
 function extractText(response) {
