@@ -495,7 +495,15 @@
       const res = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'chat', messages: chatHistory, reading: state.reading, sessionId: SESSION_ID }),
+        body: JSON.stringify({
+          action: 'chat',
+          messages: chatHistory,
+          reading: state.reading,
+          sessionId: SESSION_ID,
+          reflections: (state.status === 'approved' && state.answers)
+            ? { questions: state.questions, answers: state.answers }
+            : null,
+        }),
       });
       if (!res.ok) throw new Error('Request failed: ' + res.status);
       const data = await res.json();

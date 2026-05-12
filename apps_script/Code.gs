@@ -470,15 +470,27 @@ function handleChat(body) {
   const messages = body.messages || [];
   const reading = body.reading || '';
   const sessionId = body.sessionId || 'unknown';
+  const reflections = body.reflections || null;
   let passageText = '';
   try {
     if (reading) passageText = fetchEsvPlainText(reading);
   } catch (_) { /* non-fatal */ }
 
+  let reflectionsBlock = '';
+  if (reflections && Array.isArray(reflections.questions) && Array.isArray(reflections.answers)) {
+    reflectionsBlock = "\nApproved reflections shown on the site today (the user can see these):\n";
+    for (let i = 0; i < reflections.questions.length; i++) {
+      reflectionsBlock += 'Q' + (i + 1) + ': ' + reflections.questions[i] + '\n';
+      reflectionsBlock += 'A' + (i + 1) + ': ' + (reflections.answers[i] || '') + '\n\n';
+    }
+    reflectionsBlock += 'You may be asked to expand on, defend, or clarify any of these. Stay consistent with them unless the user explicitly asks for a different angle.\n';
+  }
+
   const system =
     "You are a knowledgeable, conservative Bible study assistant for the daily reading plan at " +
     "a Bible-believing church. The user is reading " + (reading || '(no passage)') + " today.\n\n" +
-    "Today's passage (ESV):\n" + (passageText || '(unavailable)') + "\n\n" +
+    "Today's passage (ESV):\n" + (passageText || '(unavailable)') + "\n" +
+    reflectionsBlock + "\n" +
     "STRICT SCOPE — these are hard rules:\n" +
     "- Only answer questions about TODAY'S READING, related Scripture passages, biblical theology, biblical history, biblical languages (Greek/Hebrew context), and Christian doctrine grounded in Scripture.\n" +
     "- Allowed: cross-references from elsewhere in the Bible, word studies, historical/cultural context of the passage, how the passage fits the broader biblical narrative, applications for Christian living grounded in this text.\n" +
