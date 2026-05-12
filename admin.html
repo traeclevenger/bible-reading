@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Like the Teacher — Rewrite</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+  :root {
+    --bg: #ffffff; --surface: #f7f9f8; --surface2: #eef2f0;
+    --accent: #96aa9e; --accent2: #6a7e72; --accent3: #3f5648;
+    --text: #1a221e; --subtext: #6a7e72; --border: #d8e0db;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    max-width: 780px; margin: 0 auto; padding: 28px 24px 60px;
+    position: relative;
+  }
+  .watermark {
+    position: fixed; inset: 0; pointer-events: none; z-index: -1;
+    background: url('heart-hands.png') center 45% / 480px no-repeat;
+    opacity: 0.06;
+  }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .site-logo { height: 44px; }
+  .htitle { font-family: Georgia, serif; font-size: 1.2rem; color: var(--accent3); }
+  .htitle small { display: block; font-size: 0.72rem; color: var(--subtext); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+  h1 { font-family: Georgia, serif; color: var(--accent3); font-size: 1.4rem; margin-bottom: 4px; }
+  .meta { font-size: 0.85rem; color: var(--subtext); margin-bottom: 24px; }
+  .qa { margin-bottom: 22px; }
+  .qa label {
+    display: block; font-size: 0.88rem; font-weight: 600; color: var(--accent3);
+    margin-bottom: 6px; line-height: 1.4;
+  }
+  textarea {
+    width: 100%; min-height: 110px; padding: 11px 13px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: inherit; font-size: 0.92rem; line-height: 1.55;
+    resize: vertical; outline: none;
+  }
+  textarea:focus { border-color: var(--accent2); background: #fff; }
+  .actions { display: flex; gap: 10px; margin-top: 28px; align-items: center; }
+  button {
+    padding: 11px 22px; border: none; border-radius: 6px;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .btn-primary { background: var(--accent2); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent3); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status { font-size: 0.86rem; color: var(--subtext); }
+  .status.error { color: #b00020; }
+  .status.success { color: var(--accent3); font-weight: 600; }
+  .tip {
+    font-size: 0.78rem; color: var(--subtext); margin-top: 5px;
+    background: var(--surface2); padding: 6px 9px; border-radius: 5px;
+    border-left: 3px solid var(--accent);
+  }
+</style>
+</head>
+<body>
+<div class="watermark"></div>
+<header>
+  <img src="WS logo.png" alt="Westside" class="site-logo">
+  <div class="htitle">Like the Teacher<small>Admin · Rewrite</small></div>
+</header>
+
+<h1 id="reading">Loading…</h1>
+<div class="meta" id="meta"></div>
+
+<form id="form" style="display:none;">
+  <div id="qaList"></div>
+  <div class="actions">
+    <button type="submit" class="btn-primary" id="saveBtn">Save & Approve</button>
+    <span class="status" id="status"></span>
+  </div>
+</form>
+
+<script>
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwr9_wwNh7eCcF-kGIeAoUPiGEC0wx3tzlRTB0BwmfNlucdjQsEWimTvnQtvnpVeE9d/exec';
+
+  const params = new URLSearchParams(location.search);
+  const date = params.get('date');
+  const token = params.get('token');
+
+  function bgUrl(ref) {
+    return 'https://www.biblegateway.com/passage/?search=' + encodeURIComponent(ref) + '&version=ESV';
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  async function load() {
+    if (!date || !token) { document.getElementById('reading').textContent = 'Missing date or token.'; return; }
+    try {
+      const res = await fetch(APPS_SCRIPT_URL + '?action=pending&date=' + encodeURIComponent(date) + '&token=' + encodeURIComponent(token));
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      document.getElementById('reading').textContent = data.reading;
+      document.getElementById('meta').innerHTML =
+        escapeHtml(data.date) + ' · status: <strong>' + escapeHtml(data.status) + '</strong> · ' +
+        '<a target="_blank" rel="noopener" href="' + bgUrl(data.reading) + '">Open passage ↗</a>';
+
+      const list = document.getElementById('qaList');
+      list.innerHTML = data.questions.map((q, i) => `
+        <div class="qa">
+          <label>${i + 1}. ${escapeHtml(q)}</label>
+          <textarea name="a${i}" data-idx="${i}">${escapeHtml(data.answers[i] || '')}</textarea>
+          <div class="tip">Cite cross-references inline as <code>[[Book C:V]]</code> — they'll auto-link on the site.</div>
+        </div>
+      `).join('');
+      document.getElementById('form').style.display = 'block';
+    } catch (err) {
+      document.getElementById('reading').textContent = 'Error: ' + err.message;
+    }
+  }
+
+  document.getElementById('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const answers = Array.from(document.querySelectorAll('textarea')).map(t => t.value.trim());
+    const status = document.getElementById('status');
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    status.className = 'status';
+    status.textContent = 'Saving…';
+    try {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'save', date, token, answers }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      status.className = 'status success';
+      status.textContent = 'Saved & approved. Live on the site.';
+    } catch (err) {
+      status.className = 'status error';
+      status.textContent = 'Failed: ' + err.message;
+      btn.disabled = false;
+    }
+  });
+
+  load();
+</script>
+</body>
+</html>
