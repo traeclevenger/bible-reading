@@ -561,6 +561,49 @@ function logUsage(sessionId, reading, question, answer, model) {
   } catch (_) { /* swallow */ }
 }
 
+/**
+ * Run this manually from the Apps Script editor to verify analytics logging.
+ * Forces a re-auth prompt for SpreadsheetApp/Drive if needed, then writes a
+ * test row and logs the sheet URL. Re-throws any error so you can see it.
+ */
+function testLogging() {
+  const props = PropertiesService.getScriptProperties();
+  logUsageStrict('test-session-' + Date.now(), 'Test reading', 'Test question?', 'Test answer.', 'test-model');
+  const sheetId = props.getProperty('ANALYTICS_SHEET_ID');
+  if (!sheetId) throw new Error('ANALYTICS_SHEET_ID was not set after logUsage. Check auth scopes.');
+  const ss = SpreadsheetApp.openById(sheetId);
+  Logger.log('Sheet URL: ' + ss.getUrl());
+  return ss.getUrl();
+}
+
+// Non-swallowing variant of logUsage used by testLogging() so errors surface.
+function logUsageStrict(sessionId, reading, question, answer, model) {
+  const props = PropertiesService.getScriptProperties();
+  let sheetId = props.getProperty('ANALYTICS_SHEET_ID');
+  const ownerIds = (props.getProperty('OWNER_SESSION_IDS') || '')
+    .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  const isOwner = ownerIds.indexOf(sessionId) >= 0;
+
+  let ss, sheet;
+  if (!sheetId) {
+    ss = SpreadsheetApp.create('Bible Reading Usage');
+    sheet = ss.getActiveSheet();
+    sheet.setName('Usage');
+    sheet.appendRow(['Timestamp', 'Session ID', 'Owner', 'Reading', 'Question', 'Response', 'Model']);
+    sheet.setFrozenRows(1);
+    props.setProperty('ANALYTICS_SHEET_ID', ss.getId());
+  } else {
+    ss = SpreadsheetApp.openById(sheetId);
+    sheet = ss.getSheetByName('Usage');
+    if (sheet.getLastColumn() < 7) sheet.getRange(1, 7).setValue('Model');
+  }
+  sheet.appendRow([
+    new Date().toISOString(), sessionId, isOwner ? 'yes' : '',
+    reading || '', (question || '').slice(0, 500),
+    (answer || '').slice(0, 1500), model || '',
+  ]);
+}
+
 function setupDailyDigestTrigger() {
   ScriptApp.getProjectTriggers()
     .filter(function (t) { return t.getHandlerFunction() === 'sendDailyDigest'; })
