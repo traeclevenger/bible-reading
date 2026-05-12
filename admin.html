@@ -24,16 +24,12 @@
   }
   .watermark {
     position: fixed; pointer-events: none; z-index: 0;
-    right: 0; top: 68px; width: 50vw; height: calc(100vh - 68px);
-    background: url('watermark.png') center center / 45% no-repeat;
+    left: 0; right: 0; top: 84px; height: calc(100vh - 84px);
+    background: url('watermark.png') center center / 480px no-repeat;
     opacity: 0.50;
   }
-  @media (max-width: 900px) {
-    .watermark {
-      right: 0; left: 0; width: 100vw;
-      background-size: 50% auto;
-      background-position: center 30%;
-    }
+  @media (max-width: 600px) {
+    .watermark { background-size: 65% auto; background-position: center 30%; }
   }
   header {
     background: #fff; border-bottom: 1px solid var(--border);
