@@ -499,12 +499,13 @@ function handleChat(body) {
     messages: messages,
   });
   const answer = extractText(response).trim();
+  const modelUsed = response.model || '';
 
   // Log the last user turn + this answer to the analytics sheet.
   try {
     const lastUser = [...messages].reverse().find(function (m) { return m.role === 'user'; });
     const question = lastUser && typeof lastUser.content === 'string' ? lastUser.content : '';
-    logUsage(sessionId, reading, question, answer);
+    logUsage(sessionId, reading, question, answer, modelUsed);
   } catch (_) { /* never let logging break the response */ }
 
   return { answer: answer };
@@ -512,7 +513,7 @@ function handleChat(body) {
 
 // ── Chat analytics ────────────────────────────────────────────────────────────
 
-function logUsage(sessionId, reading, question, answer) {
+function logUsage(sessionId, reading, question, answer, model) {
   try {
     const props = PropertiesService.getScriptProperties();
     let sheetId = props.getProperty('ANALYTICS_SHEET_ID');
@@ -520,24 +521,30 @@ function logUsage(sessionId, reading, question, answer) {
       .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     const isOwner = ownerIds.indexOf(sessionId) >= 0;
 
-    let ss;
+    let ss, sheet;
     if (!sheetId) {
       ss = SpreadsheetApp.create('Bible Reading Usage');
-      const sheet = ss.getActiveSheet();
+      sheet = ss.getActiveSheet();
       sheet.setName('Usage');
-      sheet.appendRow(['Timestamp', 'Session ID', 'Owner', 'Reading', 'Question', 'Response']);
+      sheet.appendRow(['Timestamp', 'Session ID', 'Owner', 'Reading', 'Question', 'Response', 'Model']);
       sheet.setFrozenRows(1);
       props.setProperty('ANALYTICS_SHEET_ID', ss.getId());
     } else {
       ss = SpreadsheetApp.openById(sheetId);
+      sheet = ss.getSheetByName('Usage');
+      // Backfill the Model header on existing sheets created before this column existed.
+      if (sheet.getLastColumn() < 7) {
+        sheet.getRange(1, 7).setValue('Model');
+      }
     }
-    ss.getSheetByName('Usage').appendRow([
+    sheet.appendRow([
       new Date().toISOString(),
       sessionId,
       isOwner ? 'yes' : '',
       reading || '',
       (question || '').slice(0, 500),
       (answer || '').slice(0, 1500),
+      model || '',
     ]);
   } catch (_) { /* swallow */ }
 }
