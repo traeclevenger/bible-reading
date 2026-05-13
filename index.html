@@ -234,8 +234,8 @@
     .col.collapsed .chat-input-wrap { display: none; }
     .col.collapsed .col-header {
       background: var(--forest);
-      height: 100%; flex: 1; padding: 14px 0;
-      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      height: 100%; flex: 1; padding: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 10px;
     }
     .col.collapsed .col-header h2 {
@@ -266,13 +266,16 @@
       border-right: none; border-bottom: 1px solid var(--border);
       display: block; overflow: visible;
     }
-    .col-header { cursor: pointer; user-select: none; position: relative; padding-right: 36px; }
-    .col-header::after {
+    #col-answers .col-header,
+    #col-chat .col-header { cursor: pointer; user-select: none; position: relative; padding-right: 36px; }
+    #col-answers .col-header::after,
+    #col-chat .col-header::after {
       content: '▾'; position: absolute; right: 16px; top: 50%;
       transform: translateY(-50%); color: rgba(255,255,255,0.85); font-size: 0.9rem;
       transition: transform 0.2s;
     }
-    .col.collapsed .col-header::after { transform: translateY(-50%) rotate(-90deg); }
+    #col-answers.col.collapsed .col-header::after,
+    #col-chat.col.collapsed .col-header::after { transform: translateY(-50%) rotate(-90deg); }
     .col.collapsed .col-body,
     .col.collapsed .chat-messages,
     .col.collapsed .chat-input-wrap { display: none; }
@@ -306,7 +309,7 @@
 
   <!-- Column 1: Reading -->
   <section class="col" id="col-reading">
-    <div class="col-header" onclick="toggleCol('col-reading')">
+    <div class="col-header">
       <h2 id="readingTitle">Today's Reading</h2>
       <div class="sub" id="readingNote">&nbsp;</div>
     </div>
@@ -392,15 +395,17 @@
 
   function toggleCol(id) {
     const isMobile = window.innerWidth <= 900;
-    if (!isMobile && id === 'col-reading') return;  // left column never collapses on desktop
     document.getElementById(id).classList.toggle('collapsed');
     if (!isMobile) updateLayoutCollapseClasses();
   }
 
   function updateLayoutCollapseClasses() {
     const layout = document.querySelector('.layout');
-    layout.classList.toggle('middle-collapsed', document.getElementById('col-answers').classList.contains('collapsed'));
-    layout.classList.toggle('right-collapsed', document.getElementById('col-chat').classList.contains('collapsed'));
+    const answersCollapsed = document.getElementById('col-answers').classList.contains('collapsed');
+    const chatCollapsed = document.getElementById('col-chat').classList.contains('collapsed');
+    layout.classList.toggle('middle-collapsed', answersCollapsed);
+    layout.classList.toggle('right-collapsed', chatCollapsed);
+    document.querySelector('.watermark').style.display = (answersCollapsed || chatCollapsed) ? 'none' : '';
   }
 
   async function loadToday() {
@@ -608,9 +613,8 @@
     recognition.onend = () => { listening = false; micBtn.classList.remove('listening'); };
   }
 
-  // Default-collapse the top two sections on mobile so the chat is visible.
+  // Default-collapse reflection on mobile so the chat is visible.
   if (window.innerWidth <= 900) {
-    document.getElementById('col-reading').classList.add('collapsed');
     document.getElementById('col-answers').classList.add('collapsed');
   }
 
