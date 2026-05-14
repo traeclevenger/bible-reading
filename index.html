@@ -248,9 +248,9 @@
       margin-top: 4px;
     }
     /* Adjusted column ratios based on which side(s) are collapsed. */
-    .layout.middle-collapsed { grid-template-columns: 2fr 44px 1fr; }
-    .layout.right-collapsed  { grid-template-columns: 1fr 1fr 44px; }
-    .layout.middle-collapsed.right-collapsed { grid-template-columns: 1fr 44px 44px; }
+    .layout.middle-collapsed { grid-template-columns: 2fr 54px 1fr; }
+    .layout.right-collapsed  { grid-template-columns: 1fr 1fr 54px; }
+    .layout.middle-collapsed.right-collapsed { grid-template-columns: 1fr 54px 54px; }
   }
 
   @media (max-width: 900px) {
@@ -405,7 +405,7 @@
     const chatCollapsed = document.getElementById('col-chat').classList.contains('collapsed');
     layout.classList.toggle('middle-collapsed', answersCollapsed);
     layout.classList.toggle('right-collapsed', chatCollapsed);
-    document.querySelector('.watermark').style.display = (answersCollapsed || chatCollapsed) ? 'none' : '';
+    document.querySelector('.watermark').style.display = chatCollapsed ? 'none' : '';
   }
 
   async function loadToday() {
