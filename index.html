@@ -614,9 +614,31 @@
   }
 
   // Default-collapse reflection on mobile so the chat is visible.
-  if (window.innerWidth <= 900) {
+  const MOBILE_BP = 900;
+  if (window.innerWidth <= MOBILE_BP) {
     document.getElementById('col-answers').classList.add('collapsed');
   }
+
+  // When the viewport crosses the mobile/desktop breakpoint (e.g. iPad rotation),
+  // reset collapsed states to the appropriate defaults for that mode.
+  let prevMobile = window.innerWidth <= MOBILE_BP;
+  window.addEventListener('resize', function() {
+    const nowMobile = window.innerWidth <= MOBILE_BP;
+    if (nowMobile === prevMobile) return;
+    prevMobile = nowMobile;
+    const colAnswers = document.getElementById('col-answers');
+    const colChat = document.getElementById('col-chat');
+    if (nowMobile) {
+      // Entering mobile: collapse reflection, expand chat
+      colAnswers.classList.add('collapsed');
+      colChat.classList.remove('collapsed');
+    } else {
+      // Entering desktop: expand all, reset layout classes
+      colAnswers.classList.remove('collapsed');
+      colChat.classList.remove('collapsed');
+      updateLayoutCollapseClasses();
+    }
+  });
 
   loadToday();
   document.getElementById('askInput').focus({ preventScroll: false });
