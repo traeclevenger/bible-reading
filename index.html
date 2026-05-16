@@ -419,37 +419,70 @@
     document.querySelector('.watermark').style.display = chatCollapsed ? 'none' : '';
   }
 
+  function localDateString() {
+    const d = new Date();
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+
+  function applyTodayData(data, skipPassageLoad) {
+    state.reading    = data.reading;
+    state.contentDate = data.contentDate;
+    state.note       = data.note || '';
+    state.questions  = data.questions || [];
+    state.answers    = data.answers;
+    state.status     = data.status;
+
+    document.getElementById('dateLabel').textContent =
+      new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+    if (!state.reading) {
+      document.getElementById('readingTitle').textContent = 'No reading scheduled';
+      document.getElementById('passage').textContent = '';
+      document.getElementById('answersBody').innerHTML = '';
+      return;
+    }
+    document.getElementById('readingTitle').textContent = state.reading;
+    document.getElementById('readingNote').textContent = state.note;
+    document.getElementById('bgLink').href = bgUrl(state.reading, 'ESV');
+    renderAnswers();
+    if (!skipPassageLoad) loadPassage();
+  }
+
   async function loadToday() {
+    const todayKey = 'today:' + localDateString();
+
+    // Serve stale cache immediately so the page appears instant on return visits.
+    let hadCache = false;
+    try {
+      const raw = localStorage.getItem(todayKey);
+      if (raw) {
+        applyTodayData(JSON.parse(raw));
+        hadCache = true;
+      }
+    } catch (_) {}
+
+    // Always fetch fresh data in the background (answers/status may have changed).
     try {
       const res = await fetch(APPS_SCRIPT_URL + '?action=today');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-
-      state.reading = data.reading;
-      state.contentDate = data.contentDate;
-      state.note = data.note || '';
-      state.questions = data.questions || [];
-      state.answers = data.answers;
-      state.status = data.status;
-
-      const today = new Date();
-      document.getElementById('dateLabel').textContent =
-        today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-
-      if (!state.reading) {
-        document.getElementById('readingTitle').textContent = 'No reading scheduled';
-        document.getElementById('passage').textContent = '';
-        document.getElementById('answersBody').innerHTML = '';
-        return;
-      }
-      document.getElementById('readingTitle').textContent = state.reading;
-      document.getElementById('readingNote').textContent = state.note;
-      document.getElementById('bgLink').href = bgUrl(state.reading, 'ESV');
-
-      renderAnswers();
-      loadPassage();
+      try {
+        localStorage.setItem(todayKey, JSON.stringify(data));
+        // Prune old today-cache entries (different date).
+        Object.keys(localStorage).forEach(function(k) {
+          if (k.startsWith('today:') && k !== todayKey) localStorage.removeItem(k);
+        });
+      } catch (_) {}
+      // Re-apply fresh data. Skip reloading passage HTML if reading is unchanged.
+      const sameReading = hadCache && state.reading === data.reading;
+      applyTodayData(data, sameReading);
     } catch (err) {
-      document.getElementById('passage').innerHTML = '<p style="color:#a00;">Couldn\'t load today: ' + escapeHtml(err.message) + '</p>';
+      if (!hadCache) {
+        document.getElementById('passage').innerHTML =
+          '<p style="color:#a00;">Couldn\'t load today: ' + escapeHtml(err.message) + '</p>';
+      }
     }
   }
 
@@ -486,9 +519,10 @@
       updateVerseRange();
       // Cache in localStorage for the rest of the day.
       try {
-        // Prune yesterday's entries before writing.
+        const today = state.contentDate || localDateString();
+        // Only prune entries from a different date, not the other version's cache.
         Object.keys(localStorage).forEach(function(k) {
-          if (k.startsWith('passage:') && k !== cacheKey) localStorage.removeItem(k);
+          if (k.startsWith('passage:') && !k.endsWith(':' + today)) localStorage.removeItem(k);
         });
         localStorage.setItem(cacheKey, html);
       } catch (_) {}
