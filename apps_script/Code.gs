@@ -165,6 +165,12 @@ function runDaily() {
     return;
   }
 
+  // Pre-warm the passage HTML cache for both versions so the first visitor
+  // of the day gets a fast response rather than a cold API call.
+  try { getPassageText(reading.reading, 'ESV'); } catch (_) {}
+  try { getPassageText(reading.reading, 'NLT'); } catch (_) {}
+
+
   let answers;
   try {
     answers = generateAnswers(reading.reading, passageText);
@@ -232,7 +238,7 @@ function generateAnswers(reading, passageText) {
 
 function sendApprovalEmail(record) {
   const siteUrl = requiredProp('SITE_URL').replace(/\/$/, '');
-  const scriptUrl = ScriptApp.getService().getUrl();
+  const scriptUrl = requiredProp('SCRIPT_URL').replace(/\/$/, '');
   const approveUrl = scriptUrl + '?action=approve&date=' + encodeURIComponent(record.date) + '&token=' + encodeURIComponent(record.token);
   const rewriteUrl = siteUrl + '/admin.html?date=' + encodeURIComponent(record.date) + '&token=' + encodeURIComponent(record.token);
 
@@ -413,16 +419,29 @@ function getPassageText(ref, version) {
   const v = (version || 'ESV').toUpperCase();
   const cache = CacheService.getScriptCache();
   const cacheKey = 'passage:' + v + ':' + ref;
+
+  // 1. Fast in-memory cache (up to 6h).
   const cached = cache.get(cacheKey);
   if (cached) return { html: cached, version: v, ref: ref, cached: true };
+
+  // 2. PropertiesService persistent cache (survives cache eviction; today-keyed).
+  const today = formatDate(new Date());
+  const propKey = 'html:' + v + ':' + today + ':' + ref;
+  const props = PropertiesService.getScriptProperties();
+  const persisted = props.getProperty(propKey);
+  if (persisted) {
+    cache.put(cacheKey, persisted, 21600);  // re-warm in-memory cache
+    return { html: persisted, version: v, ref: ref, cached: true };
+  }
 
   let html;
   if (v === 'ESV') html = fetchEsvHtml(ref);
   else if (v === 'NLT') html = fetchNltHtml(ref);
   else return { error: 'Unsupported version: ' + v };
 
-  // Cache 24h. The CacheService value limit is 100KB; truncate-safely.
+  // Store in-memory (6h) and persistently (if small enough for PropertiesService).
   if (html.length < 95000) cache.put(cacheKey, html, 21600);
+  if (html.length < 8500) props.setProperty(propKey, html);
   return { html: html, version: v, ref: ref };
 }
 
@@ -755,12 +774,20 @@ function loadDraft(dateKey) {
 function pruneOldDrafts() {
   const props = PropertiesService.getScriptProperties();
   const all = props.getProperties();
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 60);
+  const draftCutoff = new Date();
+  draftCutoff.setDate(draftCutoff.getDate() - 60);
+  const htmlCutoff = new Date();
+  htmlCutoff.setDate(htmlCutoff.getDate() - 2);  // keep 2 days of passage HTML
   Object.keys(all).forEach(function (key) {
-    if (key.indexOf('draft:') !== 0) return;
-    const d = parseDate(key.slice('draft:'.length));
-    if (d && d < cutoff) props.deleteProperty(key);
+    if (key.indexOf('draft:') === 0) {
+      const d = parseDate(key.slice('draft:'.length));
+      if (d && d < draftCutoff) props.deleteProperty(key);
+    } else if (key.indexOf('html:') === 0) {
+      // key format: html:VERSION:DATE:ref
+      const parts = key.split(':');
+      const d = parts.length >= 3 ? parseDate(parts[2]) : null;
+      if (d && d < htmlCutoff) props.deleteProperty(key);
+    }
   });
 }
 

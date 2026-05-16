@@ -139,8 +139,19 @@
     font-size: 0.7rem; vertical-align: super; color: var(--accent2);
     font-weight: 700; margin-right: 2px;
   }
-  .passage .chapter-num { font-size: 1.4rem; color: var(--accent3); font-weight: 700; float: left; line-height: 1; margin: 0 6px 0 0; }
+  /* Chapter-number markers are replaced by JS with a small verse-num; hide as fallback. */
+  .passage .chapter-num, .passage .chapter-number, .passage .cw_ch { display: none; }
   .passage .copyright, .passage .extra-material { font-size: 0.7rem; color: var(--subtext); margin-top: 14px; }
+  /* NLT passage header ("Titus 3:1-15, NLT") — hide */
+  .passage .bk_ch_vs_header, .passage .bibleref { display: none !important; }
+  /* NLT paragraph indents — left-justify like ESV */
+  .passage .body-indent, .passage .body-ch-hd,
+  .passage p[class*="indent"], .passage p[class*="-indent"] {
+    text-indent: 0 !important; padding-left: 0 !important; margin-left: 0 !important;
+  }
+  /* Strip inline color/background that NLT injects */
+  .passage [style*="color"] { color: inherit !important; }
+  .passage [style*="background"] { background: transparent !important; }
 
   /* ── Q&A column (suggested answers) ── */
   .qa-item { margin-bottom: 16px; }
@@ -453,11 +464,58 @@
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       el.innerHTML = data.html || '<p>(no text returned)</p>';
+      normalizeChapterMarker(el);
       updateVerseRange();
     } catch (err) {
       el.innerHTML = '<p style="color:#a00;">Couldn\'t load text: ' + escapeHtml(err.message) +
         '</p><p><a class="open-bg" target="_blank" href="' + bgUrl(state.reading, state.version) + '">Open on Bible Gateway ↗</a></p>';
     }
+  }
+
+  // Replace the large chapter-number element (ESV: "3:1", NLT: "3") with a small
+  // verse-num marker so verse 1 looks the same as every other verse number.
+  function normalizeChapterMarker(container) {
+    const passage = container.querySelector ? container : document.getElementById('passage');
+    if (!passage) return;
+    const markers = [...passage.querySelectorAll('.chapter-num, .chapter-number, .cw_ch')];
+    if (!markers.length) return;
+
+    // ESV renders "3:1" — extract the verse number. NLT renders "3" — default to "1".
+    let verseN = '1';
+    for (const el of markers) {
+      const m = (el.textContent || '').trim().match(/:\s*(\d+)/);
+      if (m) { verseN = m[1]; break; }
+    }
+
+    // Remove all markers; clean up any now-empty wrapper paragraphs.
+    markers.forEach(function(el) {
+      const wrap = el.parentElement;
+      el.remove();
+      if (wrap && wrap !== passage && wrap.tagName === 'P' && wrap.textContent.trim() === '') {
+        wrap.remove();
+      }
+    });
+
+    // Find the first paragraph containing actual verse content.
+    let target = passage.querySelector('p.body-ch-hd, .body-ch-hd');
+    if (!target) {
+      const ps = passage.querySelectorAll('p');
+      for (let i = 0; i < ps.length; i++) {
+        if (ps[i].textContent.trim().length > 5) { target = ps[i]; break; }
+      }
+    }
+    if (!target) return;
+
+    // Don't double-add if verse-1 marker is already present.
+    const first = target.firstElementChild;
+    const VCLS = ['verse-num', 'vn', 'v-num', 'verse'];
+    if (first && VCLS.some(function(c) { return first.classList.contains(c); }) &&
+        (first.textContent || '').trim() === verseN) return;
+
+    const marker = document.createElement('span');
+    marker.className = 'verse-num';
+    marker.textContent = verseN;
+    target.insertBefore(marker, target.firstChild);
   }
 
   function updateVerseRange() {
@@ -467,8 +525,8 @@
     const nums = Array.from(passage.querySelectorAll('.verse-num, .vn'))
       .map(n => parseInt(n.textContent.replace(/\D/g, ''), 10))
       .filter(n => !isNaN(n));
-    // ESV renders the chapter opening as a chapter-num (e.g. "4:1") and omits a verse-num for v1.
-    if (passage.querySelector('.chapter-num') && (!nums.length || Math.min(...nums) > 1)) nums.push(1);
+    // normalizeChapterMarker() has already converted any chapter-num into a .verse-num span,
+    // so verse 1 is always included in the nums array above — no special case needed.
     let range = '';
     if (nums.length) {
       range = 'Verses ' + Math.min(...nums) + ' to ' + Math.max(...nums);
