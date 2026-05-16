@@ -453,9 +453,26 @@
     }
   }
 
+  function passageCacheKey(ref, version, date) {
+    return 'passage:' + version + ':' + ref + ':' + date;
+  }
+
   async function loadPassage() {
     if (!state.reading) return;
     const el = document.getElementById('passage');
+
+    // Check localStorage first — same reading + version + date = serve instantly.
+    const cacheKey = passageCacheKey(state.reading, state.version, state.contentDate || state.date);
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        el.innerHTML = cached;
+        normalizeChapterMarker(el);
+        updateVerseRange();
+        return;
+      }
+    } catch (_) {}
+
     el.innerHTML = '<p style="color:var(--subtext);font-style:italic;">Loading ' + state.version + '…</p>';
     try {
       const res = await fetch(APPS_SCRIPT_URL +
@@ -463,9 +480,18 @@
         '&version=' + state.version);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      el.innerHTML = data.html || '<p>(no text returned)</p>';
+      const html = data.html || '<p>(no text returned)</p>';
+      el.innerHTML = html;
       normalizeChapterMarker(el);
       updateVerseRange();
+      // Cache in localStorage for the rest of the day.
+      try {
+        // Prune yesterday's entries before writing.
+        Object.keys(localStorage).forEach(function(k) {
+          if (k.startsWith('passage:') && k !== cacheKey) localStorage.removeItem(k);
+        });
+        localStorage.setItem(cacheKey, html);
+      } catch (_) {}
     } catch (err) {
       el.innerHTML = '<p style="color:#a00;">Couldn\'t load text: ' + escapeHtml(err.message) +
         '</p><p><a class="open-bg" target="_blank" href="' + bgUrl(state.reading, state.version) + '">Open on Bible Gateway ↗</a></p>';
