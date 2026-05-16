@@ -372,10 +372,10 @@ function readingForDate(date) {
   let note = '';
   if (dow === 6) {           // Sat → Fri
     target.setDate(target.getDate() - 1);
-    note = "Saturday — showing Friday's reading.";
+    note = "(Friday's reading)";
   } else if (dow === 0) {    // Sun → next Mon
     target.setDate(target.getDate() + 1);
-    note = "Sunday — showing Monday's reading.";
+    note = "(Monday's reading)";
   }
 
   const dayIdx = businessDayIndex(target);
