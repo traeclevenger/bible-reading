@@ -123,6 +123,7 @@ function doPost(e) {
     const action = body.action;
     if (action === 'chat') return jsonOut(handleChat(body));
     if (action === 'save') return jsonOut(handleAdminSave(body));
+    if (action === 'visit') return jsonOut(handleVisit(body));
     return jsonOut({ error: 'Unknown action.' });
   } catch (err) {
     notifyError('doPost failed', err);
@@ -636,6 +637,52 @@ function logUsage(sessionId, reading, question, answer, model) {
       model || '',
     ]);
   } catch (_) { /* swallow */ }
+}
+
+// ── Visitor logging ───────────────────────────────────────────────────────────
+
+function handleVisit(body) {
+  try {
+    const sessionId = body.sessionId || 'unknown';
+    const reading   = body.reading   || '';
+    const date      = body.date      || '';
+    const props     = PropertiesService.getScriptProperties();
+    const ownerIds  = (props.getProperty('OWNER_SESSION_IDS') || '')
+      .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    const isOwner   = ownerIds.indexOf(sessionId) >= 0;
+
+    let sheetId = props.getProperty('ANALYTICS_SHEET_ID');
+    let ss;
+    if (!sheetId) {
+      ss = SpreadsheetApp.create('Bible Reading Usage');
+      props.setProperty('ANALYTICS_SHEET_ID', ss.getId());
+      const usage = ss.getActiveSheet();
+      usage.setName('Usage');
+      usage.appendRow(['Timestamp', 'Session ID', 'Owner', 'Reading', 'Question', 'Response', 'Model']);
+      usage.setFrozenRows(1);
+    } else {
+      ss = SpreadsheetApp.openById(sheetId);
+    }
+
+    // Get or create the Visitors tab.
+    let vSheet = ss.getSheetByName('Visitors');
+    if (!vSheet) {
+      vSheet = ss.insertSheet('Visitors');
+      vSheet.appendRow(['Timestamp', 'Date', 'Session ID', 'Owner', 'Reading']);
+      vSheet.setFrozenRows(1);
+    }
+
+    vSheet.appendRow([
+      new Date().toISOString(),
+      date,
+      sessionId,
+      isOwner ? 'yes' : '',
+      reading,
+    ]);
+    return { ok: true };
+  } catch (err) {
+    return { error: String(err.message || err) };
+  }
 }
 
 /**

@@ -478,6 +478,18 @@
       // Re-apply fresh data. Skip reloading passage HTML if reading is unchanged.
       const sameReading = hadCache && state.reading === data.reading;
       applyTodayData(data, sameReading);
+
+      // Log a visit once per session per day (fire-and-forget, non-blocking).
+      const visitKey = 'visited:' + localDateString();
+      if (!localStorage.getItem(visitKey)) {
+        fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'visit', sessionId: SESSION_ID, reading: data.reading, date: localDateString() }),
+        }).then(function() {
+          try { localStorage.setItem(visitKey, '1'); } catch (_) {}
+        }).catch(function() {});
+      }
     } catch (err) {
       if (!hadCache) {
         document.getElementById('passage').innerHTML =
