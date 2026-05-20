@@ -444,10 +444,13 @@
       return;
     }
     document.getElementById('readingTitle').textContent = state.reading;
-    document.getElementById('readingNote').textContent = state.note;
     document.getElementById('bgLink').href = bgUrl(state.reading, 'ESV');
     renderAnswers();
-    if (!skipPassageLoad) loadPassage();
+    if (!skipPassageLoad) {
+      loadPassage(); // loadPassage calls updateVerseRange() after rendering
+    } else {
+      updateVerseRange(); // passage already rendered; just recompute note + range
+    }
   }
 
   async function loadToday() {
